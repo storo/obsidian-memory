@@ -1,0 +1,22 @@
+{
+  "name": "obsidian-memory",
+  "version": "0.1.0",
+  "description": "Single-source memory system for Claude Code backed by an Obsidian vault. Zettelkasten notes, session logs, and decision tracking — no fragmented state across .claude/memory, auto-memory, or .remember.",
+  "author": {
+    "name": "Sergio Toro Diaz",
+    "email": "debian.storo@gmail.com",
+    "url": "https://github.com/storo"
+  },
+  "homepage": "https://github.com/storo/obsidian-memory",
+  "repository": "https://github.com/storo/obsidian-memory",
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "obsidian",
+    "zettelkasten",
+    "persistence",
+    "session-logs",
+    "decision-log",
+    "claude-code"
+  ]
+}
