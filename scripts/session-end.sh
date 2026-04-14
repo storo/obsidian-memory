@@ -16,13 +16,15 @@ TS="$(today_ts)"
 LOG_DIR="$VAULT/logs"
 STUB="$LOG_DIR/${TODAY}-session-end.md"
 
-# If a log for today already exists that is newer than this stub would be,
-# don't overwrite it.
+# If a log for today already exists with real content (>200 bytes), don't
+# overwrite — portable across GNU/BSD stat.
 if ls "$LOG_DIR/${TODAY}-"*.md >/dev/null 2>&1; then
   newest=$(ls -t "$LOG_DIR/${TODAY}-"*.md 2>/dev/null | head -1)
-  if [ -n "$newest" ] && [ "$(stat -c %s "$newest" 2>/dev/null || echo 0)" -gt 200 ]; then
-    # there is already a real log from today
-    exit 0
+  if [ -n "$newest" ]; then
+    size=$(stat -c %s "$newest" 2>/dev/null || stat -f %z "$newest" 2>/dev/null || echo 0)
+    if [ "$size" -gt 200 ]; then
+      exit 0
+    fi
   fi
 fi
 

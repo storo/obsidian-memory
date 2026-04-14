@@ -44,10 +44,11 @@ _(bullet list with repo-relative paths)_
 _(what's left, what to pick up from)_
 EOF
 
-# Rotate now.md buffer if it exists and has content
+# Rotate now.md buffer: move to .bak instead of truncating, so content is
+# recoverable if Claude never fills in the log scaffold after this script.
 NOW_FILE="$VAULT/logs/now.md"
 if [ -f "$NOW_FILE" ] && [ -s "$NOW_FILE" ]; then
-  : > "$NOW_FILE"
+  mv "$NOW_FILE" "${NOW_FILE}.bak"
 fi
 
 echo "$FILE"

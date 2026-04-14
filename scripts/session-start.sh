@@ -47,11 +47,17 @@ if [ -f "$VAULT/logs/now.md" ]; then
   NOW=$(cat "$VAULT/logs/now.md" 2>/dev/null)
 fi
 
-# 4. last 3 session logs (excluding now.md)
+# 4. last 3 session logs (excluding now.md) — portable across GNU/BSD stat
 RECENT_LOGS=""
 if [ -d "$VAULT/logs" ]; then
-  mapfile -t RECENT < <(find "$VAULT/logs" -maxdepth 1 -type f -name '20*.md' -printf '%T@ %p\n' 2>/dev/null \
-    | sort -rn | head -3 | awk '{print $2}')
+  mapfile -t RECENT < <(
+    find "$VAULT/logs" -maxdepth 1 -type f -name '20*.md' 2>/dev/null \
+      | while read -r f; do
+          mtime=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0)
+          echo "$mtime $f"
+        done \
+      | sort -rn | head -3 | awk '{$1=""; sub(/^ /,""); print}'
+  )
   for f in "${RECENT[@]}"; do
     [ -n "$f" ] || continue
     RECENT_LOGS+=$'\n### '"$(basename "$f" .md)"$'\n'

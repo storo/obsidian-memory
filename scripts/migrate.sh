@@ -24,7 +24,10 @@ else
 fi
 
 # -------- 2. create symlink from auto-memory hardcoded path --------
-AUTO_MEMORY="$HOME/.claude/projects/-home-storo/memory"
+# Claude Code encodes the user's $HOME as the project slug by replacing '/'
+# with '-'. Derive it at runtime so the script works for any user.
+AUTO_SLUG="$(echo "$HOME" | tr '/' '-')"
+AUTO_MEMORY="$HOME/.claude/projects/${AUTO_SLUG}/memory"
 AUTO_PARENT="$(dirname "$AUTO_MEMORY")"
 mkdir -p "$AUTO_PARENT"
 
