@@ -63,13 +63,27 @@ ensure_vault() {
 # -------- locate current session JSONL --------
 # Claude Code stores raw conversation logs at
 #   $HOME/.claude/projects/<slug>/<session-id>.jsonl
-# where <slug> is $HOME with slashes replaced by hyphens. We resolve the
-# "current" one as the most recently modified jsonl in that directory.
+# where <slug> is the project's working directory with slashes replaced by
+# hyphens — NOT $HOME. Each project Claude Code is launched from has its
+# own slug directory.
+#
+# Resolution order for the "current project":
+#   1. $CLAUDE_PROJECT_DIR — set by Claude Code in hook env (authoritative)
+#   2. $PWD — shell's current directory when script was invoked
+#   3. $HOME — last-resort fallback
+#
+# Within the resolved slug dir, "current session jsonl" = most recently
+# modified *.jsonl file.
 find_current_jsonl() {
+  local project="${CLAUDE_PROJECT_DIR:-${PWD:-$HOME}}"
   local slug
-  slug="$(echo "$HOME" | tr '/' '-')"
+  slug="$(echo "$project" | tr '/' '-')"
   local dir="$HOME/.claude/projects/${slug}"
-  [ -d "$dir" ] || { echo ""; return 1; }
+  if [ ! -d "$dir" ]; then
+    log_error "find_current_jsonl: dir not found for project '$project' -> $dir"
+    echo ""
+    return 1
+  fi
   local latest
   latest=$(ls -t "$dir"/*.jsonl 2>/dev/null | head -1)
   echo "$latest"
