@@ -1,6 +1,6 @@
 ---
 name: review
-description: Lists decisions whose review date has passed and walks the user through renewing or closing each. Use when the user runs `/obsidian-memory:review`, says "review decisions", "what decisions are due", "check pending reviews", or at the start of a session if the SessionStart bundle showed decisions due. Reads `$VAULT/decisions/*.md`, filters by `review_date <= today` and `status: active`, presents each with its original expected outcome vs. what actually happened.
+description: 'Lists decisions whose review date has passed and walks the user through renewing or closing each. Use when the user runs /obsidian-memory:review, says "review decisions", "what decisions are due", "check pending reviews", or at session start if the SessionStart bundle showed decisions due. Reads $VAULT/decisions/*.md, filters by review_date on/before today and active status, presents each with original expected outcome vs what actually happened.'
 argument-hint: ""
 allowed-tools: Bash, Read, Edit
 ---
