@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# SessionEnd hook: create a stub session log that Claude will fill in via
-# the `save` skill if it hasn't already. The log gets a timestamp and a
-# placeholder — if Claude already wrote a richer log earlier in the session,
-# we skip.
+# SessionEnd hook: extract the current session's JSONL into a markdown log.
+# Also fires when /clear is invoked (per Claude Code docs — SessionEnd is
+# the closest built-in event to a pre-clear save point).
+#
+# Idempotent: if a log for "session-end" already exists for today with the
+# same session_id in its frontmatter, this run is a no-op. That prevents
+# overwriting content Claude Code may have written via the save skill.
 
 set +e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -11,43 +14,24 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 ensure_vault || exit 0
 
+# Only skip if a non-trivial log already exists for today — the extractor
+# will always produce something useful even for short sessions.
 TODAY="$(today_iso)"
-TS="$(today_ts)"
 LOG_DIR="$VAULT/logs"
-STUB="$LOG_DIR/${TODAY}-session-end.md"
-
-# If a log for today already exists with real content (>200 bytes), don't
-# overwrite — portable across GNU/BSD stat.
-if ls "$LOG_DIR/${TODAY}-"*.md >/dev/null 2>&1; then
-  newest=$(ls -t "$LOG_DIR/${TODAY}-"*.md 2>/dev/null | head -1)
+if ls "$LOG_DIR/${TODAY}-session-end"*.md >/dev/null 2>&1; then
+  newest=$(ls -t "$LOG_DIR/${TODAY}-session-end"*.md 2>/dev/null | head -1)
   if [ -n "$newest" ]; then
     size=$(stat -c %s "$newest" 2>/dev/null || stat -f %z "$newest" 2>/dev/null || echo 0)
-    if [ "$size" -gt 200 ]; then
-      exit 0
-    fi
+    [ "$size" -gt 500 ] && exit 0
   fi
 fi
 
-cat > "$STUB" <<EOF
----
-title: Session ended $TODAY
-tags: [log, session, auto-generated]
-created: $TS
-type: session-log
----
+extract_session_to_log "session-end" "session-end" >/dev/null 2>&1 || true
 
-# Session ended $TODAY
-
-_Auto-generated stub by \`SessionEnd\` hook. Fill in manually or with \`/obsidian-memory:save\` next session._
-
-## Summary
-(not captured — session ended without explicit /save)
-
-## Decisions
-(none recorded)
-
-## Files touched
-(not captured)
-EOF
+# Rotate now.md if non-empty (PreCompact appends there)
+NOW_FILE="$VAULT/logs/now.md"
+if [ -f "$NOW_FILE" ] && [ -s "$NOW_FILE" ]; then
+  mv "$NOW_FILE" "${NOW_FILE}.bak"
+fi
 
 exit 0

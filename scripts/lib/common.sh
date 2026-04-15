@@ -59,3 +59,51 @@ ensure_vault() {
   mkdir -p "$VAULT/logs" "$VAULT/inbox" "$VAULT/decisions" 2>/dev/null
   return 0
 }
+
+# -------- locate current session JSONL --------
+# Claude Code stores raw conversation logs at
+#   $HOME/.claude/projects/<slug>/<session-id>.jsonl
+# where <slug> is $HOME with slashes replaced by hyphens. We resolve the
+# "current" one as the most recently modified jsonl in that directory.
+find_current_jsonl() {
+  local slug
+  slug="$(echo "$HOME" | tr '/' '-')"
+  local dir="$HOME/.claude/projects/${slug}"
+  [ -d "$dir" ] || { echo ""; return 1; }
+  local latest
+  latest=$(ls -t "$dir"/*.jsonl 2>/dev/null | head -1)
+  echo "$latest"
+  [ -n "$latest" ]
+}
+
+# -------- extract session JSONL into a vault log --------
+# Usage: extract_session_to_log <output_name_without_ext> [reason]
+# Writes the extracted markdown to $VAULT/logs/<YYYY-MM-DD>-<name>.md and
+# prints the resulting path. Returns 0 on success, 1 on failure.
+extract_session_to_log() {
+  local name="${1:-session}"
+  local reason="${2:-session-end}"
+  local jsonl
+  jsonl=$(find_current_jsonl)
+  if [ -z "$jsonl" ] || [ ! -f "$jsonl" ]; then
+    log_error "no jsonl found for current session"
+    return 1
+  fi
+
+  local slug today out
+  slug=$(slugify "$name")
+  today=$(today_iso)
+  out="$VAULT/logs/${today}-${slug}.md"
+  if [ -e "$out" ]; then
+    out="$VAULT/logs/${today}-${slug}-$(date +%H%M%S).md"
+  fi
+
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if python3 "$script_dir/extract-session.py" "$jsonl" "$out" "$reason" >/dev/null 2>>"$VAULT/logs/hook-errors.log"; then
+    echo "$out"
+    return 0
+  fi
+  log_error "extract-session.py failed for $jsonl"
+  return 1
+}
