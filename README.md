@@ -62,6 +62,112 @@ export OBSIDIAN_MEMORY_VAULT="$HOME/Documents/my-vault"
 
 Or put it in `~/.claude/obsidian-memory.local.md` (one line with the path).
 
+## Obsidian app setup
+
+The plugin writes plain markdown to the vault, so Obsidian is **not required** for it to work. But Obsidian is what makes the vault browseable, graph-navigable, and queryable. Recommended setup:
+
+### 1. Install Obsidian
+
+Download from [obsidian.md](https://obsidian.md). On Linux, the AppImage is the easiest path:
+
+```bash
+# Move, chmod, and integrate with the application menu
+mkdir -p ~/Applications ~/.local/share/applications ~/.local/share/icons ~/.local/bin
+mv ~/Downloads/Obsidian-*.AppImage ~/Applications/Obsidian.AppImage
+chmod +x ~/Applications/Obsidian.AppImage
+
+# Extract the icon for the desktop entry
+mkdir -p /tmp/obsidian-extract && cd /tmp/obsidian-extract
+~/Applications/Obsidian.AppImage --appimage-extract 'usr/share/icons/hicolor/512x512/apps/obsidian.png'
+cp squashfs-root/usr/share/icons/hicolor/512x512/apps/obsidian.png ~/.local/share/icons/obsidian.png
+
+# Create the desktop entry
+cat > ~/.local/share/applications/obsidian.desktop <<EOF
+[Desktop Entry]
+Name=Obsidian
+GenericName=Knowledge base
+Exec=$HOME/Applications/Obsidian.AppImage --no-sandbox %U
+Icon=$HOME/.local/share/icons/obsidian.png
+Terminal=false
+Type=Application
+Categories=Office;TextEditor;Utility;
+MimeType=x-scheme-handler/obsidian;
+StartupWMClass=obsidian
+EOF
+
+# CLI shortcut
+ln -sfn ~/Applications/Obsidian.AppImage ~/.local/bin/obsidian
+```
+
+If `obsidian` fails with `dlopen(): error loading libfuse.so.2`, install FUSE: `sudo apt install libfuse2`.
+
+### 2. Open the vault
+
+Launch Obsidian → **"Open folder as vault"** → select `~/vault` (or wherever `OBSIDIAN_MEMORY_VAULT` points).
+
+Confirm **"Trust author and enable plugins"** when prompted.
+
+**Picker gotcha**: the folder picker wants you to select the vault from its parent. Navigate to `~/` (your home), single-click `vault` to highlight it — **do not enter it** — then click "Open". If the Open button is greyed out, you're inside the folder; click "up one level" first.
+
+### 3. Install required community plugins
+
+Settings → **Community plugins** → **Turn on community plugins** → **Browse**.
+
+Install and enable:
+
+| Plugin | Why it matters |
+|---|---|
+| **Dataview** | Queries over frontmatter. Required for `/obsidian-memory:review` to visually surface pending decisions. |
+| **Templater** | Template engine. Uses the templates already at `~/vault/templates/` for new notes. |
+| **Folders to Graph** | Renders directories as nodes in the graph view. Essential for navigating the Zettelkasten visually. |
+| **Calendar** | Sidebar calendar widget. Click a date to open that day's session log or inbox. |
+
+### 4. Configure Templater
+
+Settings → **Templater**:
+
+- **Template folder location**: `templates`
+- **Trigger Templater on new file creation**: `ON`
+- **Folder Templates** (optional): assign `templates/permanent-note.md` to `permanent/`, `templates/decision.md` to `decisions/`, `templates/session-log.md` to `logs/`.
+
+### 5. Configure the graph view (optional)
+
+Open the graph (Cmd/Ctrl+G). Useful filter presets:
+
+| Filter | Shows |
+|---|---|
+| `path:permanent` | Only consolidated Zettelkasten notes |
+| `path:decisions` | Only decision notes |
+| `tag:#feedback` | Only feedback memories |
+| `-path:logs -path:inbox` | Everything except the noise |
+
+Disable **"Orphans"** and **"Existing files only"** in the graph filters if the view looks empty after applying a filter.
+
+### 6. Git sync (recommended)
+
+The vault is a plain directory — version it with git for cross-machine sync and point-in-time recovery:
+
+```bash
+cd ~/vault
+git init -q
+git add -A
+git commit -q -m "Initial vault state"
+# Create a private repo on GitHub and push:
+gh repo create storo/vault --private --source=. --push
+```
+
+**Do not put the vault on iCloud/Dropbox/OneDrive** — those sync engines fight with Obsidian's workspace lockfile and cache. Git or Syncthing are the battle-tested options.
+
+### 7. First run check
+
+In a Claude Code session, run:
+
+```
+/obsidian-memory:note "first real note"
+```
+
+Switch to Obsidian — the note should appear under `inbox/<today>.md` within a few seconds.
+
 ## Components
 
 ### User-invoked skills
