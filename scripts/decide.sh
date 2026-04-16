@@ -51,5 +51,42 @@ _Left open — compare expected vs actual on review date._
 _Link related notes with \`[[wikilinks]]\`._
 EOF
 
+# Update MEMORY.md index
+MEMORY="$VAULT/MEMORY.md"
+if [ -f "$MEMORY" ]; then
+  SLUG_DATE="${TODAY}-${SLUG}"
+  ENTRY="- [[$SLUG_DATE]] — $TITLE · review $REVIEW"
+  if grep -q "^## Decisions" "$MEMORY"; then
+    # Use python to safely insert after "## Decisions" (avoids sed special-char issues)
+    python3 - "$MEMORY" "$ENTRY" <<'PYEOF'
+import sys, pathlib
+path, entry = pathlib.Path(sys.argv[1]), sys.argv[2]
+lines = path.read_text().splitlines(keepends=True)
+out = []
+inserted = False
+for line in lines:
+    out.append(line)
+    if not inserted and line.rstrip() == "## Decisions":
+        out.append(entry + "\n")
+        inserted = True
+path.write_text("".join(out))
+PYEOF
+  else
+    # Append new Decisions section before ## Reference, or at end
+    python3 - "$MEMORY" "$ENTRY" <<'PYEOF'
+import sys, pathlib
+path, entry = pathlib.Path(sys.argv[1]), sys.argv[2]
+lines = path.read_text().splitlines(keepends=True)
+section = "## Decisions\n" + entry + "\n\n"
+for i, line in enumerate(lines):
+    if line.rstrip() == "## Reference":
+        lines.insert(i, section)
+        path.write_text("".join(lines))
+        sys.exit(0)
+path.write_text("".join(lines) + "\n" + section)
+PYEOF
+  fi
+fi
+
 echo "$FILE"
 exit 0
