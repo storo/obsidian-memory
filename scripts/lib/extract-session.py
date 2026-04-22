@@ -22,6 +22,7 @@ markdown log is a queryable index over it.
 import json
 import os
 import sys
+from collections import Counter
 from datetime import datetime
 
 
@@ -43,7 +44,7 @@ def extract(jsonl_path: str) -> dict:
     tool_uses: dict[str, int] = {}
     files_touched: set[str] = set()
     bash_cmds: list[str] = []
-    cwds: set[str] = set()
+    cwds: Counter = Counter()
 
     for r in load_records(jsonl_path):
         ts = r.get("timestamp")
@@ -58,7 +59,7 @@ def extract(jsonl_path: str) -> dict:
         if rtype == "user":
             cwd = r.get("cwd")
             if cwd:
-                cwds.add(cwd)
+                cwds[cwd] += 1
             msg = r.get("message", {}) or {}
             content = msg.get("content")
             if isinstance(content, str):
@@ -112,11 +113,41 @@ def extract(jsonl_path: str) -> dict:
     }
 
 
+def detect_project(cwds: Counter) -> str:
+    """Derive a stable project slug from the cwds seen in the session.
+
+    Priority:
+    1. If a cwd contains `/projects/<name>/...` or ends in `/projects/<name>`,
+       use `<name>` — this matches the common `~/projects/<name>` layout.
+    2. Otherwise, basename of the most frequent cwd.
+
+    Returns "" when no cwd is available. The slug is lowercased and stripped
+    of leading dots (so `.worktrees` etc. don't leak when the heuristic falls
+    through to basename).
+    """
+    if not cwds:
+        return ""
+    most_common_cwd = cwds.most_common(1)[0][0]
+    parts = [p for p in most_common_cwd.split("/") if p]
+
+    if "projects" in parts:
+        idx = parts.index("projects")
+        if idx + 1 < len(parts):
+            return parts[idx + 1].lstrip(".").lower()
+
+    # Fallback: basename, skipping trailing dot-dirs like `.worktrees/foo`
+    for p in reversed(parts):
+        if p and not p.startswith("."):
+            return p.lower()
+    return ""
+
+
 def render_markdown(data: dict, reason: str = "session-end") -> str:
     now_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     first_ts = data["first_ts"] or now_iso
     last_ts = data["last_ts"] or now_iso
     created_date = first_ts[:10] if first_ts else datetime.now().strftime("%Y-%m-%d")
+    project = detect_project(data.get("cwds") or Counter())
 
     lines: list[str] = []
     lines.append("---")
@@ -127,6 +158,8 @@ def render_markdown(data: dict, reason: str = "session-end") -> str:
     lines.append(f"session_id: {data['session_id']}")
     lines.append(f"reason: {reason}")
     lines.append("type: session-log")
+    if project:
+        lines.append(f"project: {project}")
     lines.append("---")
     lines.append("")
     lines.append(f"# Session {created_date}")
@@ -144,6 +177,8 @@ def render_markdown(data: dict, reason: str = "session-end") -> str:
     if data["cwds"]:
         cwds = ", ".join(f"`{c}`" for c in sorted(data["cwds"]))
         lines.append(f"- **Working dirs**: {cwds}")
+    if project:
+        lines.append(f"- **Project**: `{project}`")
     lines.append(f"- **Trigger**: {reason}")
     lines.append("")
 
