@@ -29,32 +29,6 @@ truncate_chars() {
   fi
 }
 
-# Derive the current project slug from CLAUDE_PROJECT_DIR (or PWD fallback),
-# using the same heuristic as extract-session.py:detect_project:
-#   prefer `projects/<name>` path segment, else basename (skipping dot-dirs).
-current_project_slug() {
-  local cwd="${CLAUDE_PROJECT_DIR:-${PWD:-}}"
-  [ -z "$cwd" ] && return 0
-  # projects/<name> segment
-  if [[ "$cwd" == */projects/* ]]; then
-    local tail="${cwd#*/projects/}"
-    echo "${tail%%/*}" | tr '[:upper:]' '[:lower:]'
-    return 0
-  fi
-  # fallback: basename, skipping trailing dot-dirs
-  local path="$cwd"
-  while [ -n "$path" ]; do
-    local base="${path##*/}"
-    if [ -n "$base" ] && [[ "$base" != .* ]]; then
-      echo "$base" | tr '[:upper:]' '[:lower:]'
-      return 0
-    fi
-    [ "$path" = "/" ] && break
-    path="${path%/*}"
-    [ -z "$path" ] && break
-  done
-}
-
 # Does this log file belong to the current project?
 # Match order:
 #   1. `project: <slug>` frontmatter field (logs written after v0.2)

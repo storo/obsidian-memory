@@ -60,6 +60,38 @@ ensure_vault() {
   return 0
 }
 
+# -------- project slug detection --------
+# Derive a stable project slug from $CLAUDE_PROJECT_DIR (or $PWD fallback).
+# Mirrors extract-session.py:detect_project so logs and decisions agree on
+# the slug for a given cwd.
+#
+# Priority:
+#   1. `/projects/<name>/...` path segment → <name>
+#   2. basename of cwd, skipping trailing dot-dirs (.worktrees, etc.)
+#   3. empty when no cwd is available
+#
+# Output is lowercased. Emits nothing (not an error) when unresolvable.
+current_project_slug() {
+  local cwd="${CLAUDE_PROJECT_DIR:-${PWD:-}}"
+  [ -z "$cwd" ] && return 0
+  if [[ "$cwd" == */projects/* ]]; then
+    local tail="${cwd#*/projects/}"
+    echo "${tail%%/*}" | sed 's/^\.*//' | tr '[:upper:]' '[:lower:]'
+    return 0
+  fi
+  local path="$cwd"
+  while [ -n "$path" ]; do
+    local base="${path##*/}"
+    if [ -n "$base" ] && [[ "$base" != .* ]]; then
+      echo "$base" | tr '[:upper:]' '[:lower:]'
+      return 0
+    fi
+    [ "$path" = "/" ] && break
+    path="${path%/*}"
+    [ -z "$path" ] && break
+  done
+}
+
 # -------- locate current session JSONL --------
 # Claude Code stores raw conversation logs at
 #   $HOME/.claude/projects/<slug>/<session-id>.jsonl
