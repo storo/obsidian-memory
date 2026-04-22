@@ -116,15 +116,17 @@ def extract(jsonl_path: str) -> dict:
 def detect_project(cwds: Counter) -> str:
     """Derive a stable project slug from the cwds seen in the session.
 
-    Priority:
-    1. If a cwd contains `/projects/<name>/...` or ends in `/projects/<name>`,
-       use `<name>` — this matches the common `~/projects/<name>` layout.
-    2. Otherwise, basename of the most frequent cwd.
+    Only matches `<anything>/projects/<name>/...` — the user keeps work
+    repos under `~/projects/`. Anything else (~/, /tmp, arbitrary paths)
+    returns "" so callers don't invent a slug from a generic basename
+    like `tmp` or `home`.
 
-    Returns "" when no cwd is available. The slug is lowercased and stripped
-    of leading dots (so `.worktrees` etc. don't leak when the heuristic falls
-    through to basename).
+    Respects $OBSIDIAN_MEMORY_PROJECT as an override for repos that live
+    outside `~/projects/`.
     """
+    override = os.environ.get("OBSIDIAN_MEMORY_PROJECT", "").strip()
+    if override:
+        return override.lower()
     if not cwds:
         return ""
     most_common_cwd = cwds.most_common(1)[0][0]
@@ -135,10 +137,6 @@ def detect_project(cwds: Counter) -> str:
         if idx + 1 < len(parts):
             return parts[idx + 1].lstrip(".").lower()
 
-    # Fallback: basename, skipping trailing dot-dirs like `.worktrees/foo`
-    for p in reversed(parts):
-        if p and not p.startswith("."):
-            return p.lower()
     return ""
 
 

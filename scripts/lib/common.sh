@@ -65,13 +65,21 @@ ensure_vault() {
 # Mirrors extract-session.py:detect_project so logs and decisions agree on
 # the slug for a given cwd.
 #
-# Priority:
-#   1. `/projects/<name>/...` path segment → <name>
-#   2. basename of cwd, skipping trailing dot-dirs (.worktrees, etc.)
-#   3. empty when no cwd is available
+# Only matches the convention `<anything>/projects/<name>/...` — which is
+# where the user keeps work repos. Everything else (~/, /tmp, arbitrary
+# paths) returns empty, which the callers treat as "no project context"
+# and route to the global index instead of inventing a slug from a
+# generic basename.
 #
-# Output is lowercased. Emits nothing (not an error) when unresolvable.
+# $OBSIDIAN_MEMORY_PROJECT acts as an override for cases where the repo
+# lives outside ~/projects/ but the user still wants project routing.
+#
+# Output is lowercased.
 current_project_slug() {
+  if [ -n "${OBSIDIAN_MEMORY_PROJECT:-}" ]; then
+    echo "$OBSIDIAN_MEMORY_PROJECT" | tr '[:upper:]' '[:lower:]'
+    return 0
+  fi
   local cwd="${CLAUDE_PROJECT_DIR:-${PWD:-}}"
   [ -z "$cwd" ] && return 0
   if [[ "$cwd" == */projects/* ]]; then
@@ -79,17 +87,6 @@ current_project_slug() {
     echo "${tail%%/*}" | sed 's/^\.*//' | tr '[:upper:]' '[:lower:]'
     return 0
   fi
-  local path="$cwd"
-  while [ -n "$path" ]; do
-    local base="${path##*/}"
-    if [ -n "$base" ] && [[ "$base" != .* ]]; then
-      echo "$base" | tr '[:upper:]' '[:lower:]'
-      return 0
-    fi
-    [ "$path" = "/" ] && break
-    path="${path%/*}"
-    [ -z "$path" ] && break
-  done
 }
 
 # -------- locate current session JSONL --------
